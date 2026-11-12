@@ -258,3 +258,12 @@ test('recuperación de la inversión: aportes netos vs cobros', () => {
   close(r.invested, 126.5); close(r.collected, 13); close(r.pending, 113.5);
   assert.ok(r.days_left > 0 && r.eta);
 });
+
+test('cambiar tipo de insumo con stock reclasifica su valor sin descuadrar', () => {
+  const { db, ctx } = fresh();
+  const id = INV.saveItem(db, ctx, { name: 'DUPLEX', type: 'materia_prima', base_unit: 'und', pres_label: 'pliego dúplex', pres_size: 6 });
+  PU.createPurchase(db, ctx, { date: D, pay_status: 'pagado', account_code: '1101', lines: [{ kind: 'inventario', item_id: id, qty: 1, unit: 'pres', total: 1.5 }] });
+  INV.saveItem(db, ctx, { name: 'DUPLEX', type: 'empaque', base_unit: 'und', pres_label: 'pliego dúplex', pres_size: 6 }, id);
+  const ig = integrity(db); assert.ok(ig.ok, JSON.stringify(ig));
+  close(ig.checks.find(c => c.name.startsWith('Empaques')).ledger, 1.5);
+});

@@ -108,10 +108,12 @@ function saveItem(db, ctx, b, id) {
       if (old.base_unit !== data.base_unit && db.get('SELECT 1 FROM inventory_movements WHERE item_id=? LIMIT 1', id)) {
         throw bad('No se puede cambiar la unidad base de un insumo con movimientos.');
       }
-      if (old.type !== data.type && Math.abs(old.stock_value) > 0.0001) {
-        throw bad('No se puede cambiar el tipo de un insumo con saldo valorizado (afectaría las cuentas de inventario).');
-      }
       db.update('items', id, data);
+      // Cambio de tipo con saldo: se reclasifica el valor entre cuentas de inventario (asiento auditable)
+      if (old.type !== data.type && Math.abs(old.stock_value) > 0.00005) {
+        L.post(db, ctx, { date: today(), description: `Reclasificación de ${old.name}: ${old.type} → ${data.type}`, ref_type: 'reclasificacion', ref_id: id,
+          lines: [{ account: L.ITEM_ACCOUNT[data.type], debit: old.stock_value }, { account: L.ITEM_ACCOUNT[old.type], credit: old.stock_value }] });
+      }
       audit(db, ctx, 'editar', 'insumo', id, data);
       return id;
     }
