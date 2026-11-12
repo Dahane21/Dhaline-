@@ -16,6 +16,7 @@ export async function render(el) {
     ${kpi('Por cobrar', k.receivables)}${kpi('Por pagar', k.payables)}
     ${kpi('Punto de equilibrio', k.be_sales === null ? '—' : money(k.be_sales), `Avance ${pct(k.be_progress)} de los costos fijos`)}
   </div>
+  ${recoveryCard(d.recovery)}
   <div class="grid g2">
     <div class="card"><div class="card-head"><h2>Ventas netas y utilidad · 12 meses</h2></div><div class="chart-box"><canvas id="c-series" aria-label="Ventas netas, utilidad bruta y utilidad neta por mes"></canvas></div></div>
     <div class="card"><div class="card-head"><h2>Avance hacia el punto de equilibrio</h2></div>
@@ -59,4 +60,17 @@ export async function render(el) {
   };
   donut(el.querySelector('#c-exp'), el.querySelector('#l-exp'), d.expenses.map(e => ({ label: e.name, value: e.amount })));
   donut(el.querySelector('#c-q'), el.querySelector('#l-q'), d.sales_by_quality.map(q => ({ label: q.key, value: q.revenue })));
+}
+
+function recoveryCard(r) {
+  if (!r || r.invested <= 0) return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Recuperación de la inversión</h2></div><div class="empty">Registre los aportes de las socias en <a href="#/finanzas/socias">Finanzas → Aportes y retiros</a> para ver cuánto falta recuperar.</div></div>`;
+  const date = r.eta ? new Date(r.eta + 'T12:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  const eta = r.recovered ? '<b>¡Inversión recuperada!</b> Todo lo que cobres desde ahora es ganancia para reinvertir o repartir.'
+    : date ? `Al ritmo de los últimos 30 días (${money(r.last30)} cobrados, ${money(r.per_day)} por día) recuperarías todo hacia el <b>${esc(date)}</b> (en ${r.days_left} días).`
+    : 'Aún no hay cobros en los últimos 30 días para estimar una fecha.';
+  return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Recuperación de la inversión</h2><span class="small muted">desde ${esc(r.since || '')}</span></div>
+    <div class="summary"><div><span>Invertido (aportes − retiros)</span><b>${money(r.invested)}</b></div><div><span>Recuperado (cobrado a clientes)</span><b>${money(r.collected)}</b></div>
+    <div><span>Falta recuperar</span><b>${money(r.pending)}</b></div><div><span>Avance</span><b>${pct(r.progress)}</b></div>${r.receivable > 0 ? `<div><span>Por cobrar (ya vendido)</span><b>${money(r.receivable)}</b></div>` : ''}</div>
+    <div class="progress" style="margin-top:12px" role="img" aria-label="Avance ${pct(r.progress)}"><i style="width:${Math.min(100, r.progress * 100)}%"></i></div>
+    <p class="small" style="margin:10px 0 0">${eta}</p></div>`;
 }

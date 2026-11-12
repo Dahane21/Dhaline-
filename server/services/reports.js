@@ -236,6 +236,29 @@ function alerts(db) {
   return out.sort((a, b) => order[a.level] - order[b.level]);
 }
 
+// ---------- Recuperación de la inversión ----------
+/**
+ * Invertido = aportes − retiros de las socias. Recuperado = dinero cobrado a clientes (acumulado).
+ * Proyección: ritmo de cobro de los últimos 30 días.
+ */
+function recovery(db) {
+  const cap = db.get("SELECT COALESCE(SUM(CASE WHEN type='aporte' THEN amount ELSE -amount END),0) net, MIN(date) since FROM capital_moves WHERE status='activo'");
+  const invested = r2(cap.net);
+  const collected = r2(db.get("SELECT COALESCE(SUM(amount),0) s FROM sale_payments WHERE status='activo'").s);
+  const from30 = addDays(today(), -29);
+  const last30 = r2(db.get("SELECT COALESCE(SUM(amount),0) s FROM sale_payments WHERE status='activo' AND date>=?", from30).s);
+  const pending = r2(Math.max(0, invested - collected));
+  const perDay = last30 / 30;
+  const days = pending > 0 && perDay > 0 ? Math.ceil(pending / perDay) : null;
+  const receivable = r2(F.receivables(db).filter(s => s.balance > 0 && s.status !== 'cancelado').reduce((t, s) => t + s.balance, 0));
+  const allTime = incomeStatement(db, { from: '2000-01-01', to: today() });
+  return {
+    invested, collected, pending, since: cap.since, progress: invested > 0 ? Math.min(collected / invested, 9.99) : 0,
+    last30, per_day: r2(perDay), days_left: days, eta: days !== null ? addDays(today(), days) : null,
+    receivable, net_income_total: allTime.net_income, recovered: invested > 0 && collected >= invested,
+  };
+}
+
 // ---------- Dashboard ----------
 function dashboard(db, month) {
   month = month || today().slice(0, 7);
@@ -266,8 +289,8 @@ function dashboard(db, month) {
     },
     income: is, money, inventory: inv, breakeven: { be_units: be.be_units, be_sales: be.be_sales, current_units: be.current_units, current_sales: be.current_sales, progress: be.progress_pct, fixed: be.fixed },
     series, costs, expenses: is.opex.filter(o => o.amount > 0), top_sold: top, top_profitable: prof90.by_sku.slice(0, 5), by_product: prof90.by_product, sales_by_quality: salesByQuality,
-    alerts: alerts(db).slice(0, 8), demo: db.setting('demo_loaded') === '1',
+    recovery: recovery(db), alerts: alerts(db).slice(0, 8), demo: db.setting('demo_loaded') === '1',
   };
 }
 
-module.exports = { incomeStatement, cashFlow, balanceSheet, inventoryValue, saleFacts, profitability, breakEven, alerts, dashboard, skuSales };
+module.exports = { recovery, incomeStatement, cashFlow, balanceSheet, inventoryValue, saleFacts, profitability, breakEven, alerts, dashboard, skuSales };

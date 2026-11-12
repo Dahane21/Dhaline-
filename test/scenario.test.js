@@ -248,3 +248,13 @@ test('corregir compra: reemplaza la original aunque parte ya se haya usado, sin 
   close(cash['1101'], -30);
   assert.ok(integrity(db).ok, JSON.stringify(integrity(db)));
 });
+
+test('recuperación de la inversión: aportes netos vs cobros', () => {
+  const env = fresh(); const { db, ctx, prod, q } = env; produce(env);
+  const pa = db.insert('partners', { name: 'Socia' });
+  FI.capitalMove(db, ctx, { date: D, partner_id: pa, type: 'aporte', amount: 126.5, account_code: '1101' });
+  S.createSale(db, ctx, { date: D, status: 'entregado', lines: [{ kind: 'producto', product_id: prod('Chocoteja de pecanas'), quality_id: q('A'), qty: 5, unit_price: 2.6 }], payment: { account_code: '1102', amount: 13 } });
+  const r = R.recovery(db);
+  close(r.invested, 126.5); close(r.collected, 13); close(r.pending, 113.5);
+  assert.ok(r.days_left > 0 && r.eta);
+});
