@@ -39,7 +39,7 @@ export async function purchaseForm(prefill = {}, onDone) {
   const byId = id => items.find(i => String(i.id) === String(id));
   const blank = () => ({ kind: 'inventario', item_id: '', qty: '', unit: '', unit_price: '', total: '' });
   const ctl = modal({
-    title: 'Registrar compra', wide: true, submit: 'Registrar compra',
+    title: prefill.replace_id ? `Corregir compra ${prefill.replace_code}` : 'Registrar compra', wide: true, submit: prefill.replace_id ? 'Guardar corrección' : 'Registrar compra',
     body: `<div class="form-grid">
       ${field('date', 'Fecha', { type: 'date', value: prefill.date || today(), required: true })}
       ${field('supplier_id', 'Proveedor', { type: 'select', opts: options(suppliers.filter(s => s.active), { empty: '— Sin proveedor —', selected: prefill.supplier_id }) })}
@@ -48,6 +48,7 @@ export async function purchaseForm(prefill = {}, onDone) {
       ${field('voucher_type', 'Comprobante', { type: 'select', opts: options(['Ninguno', 'Boleta', 'Factura', 'Ticket', 'Recibo'].map(x => ({ id: x, name: x })), { selected: prefill.voucher_type || 'Ninguno' }) })}
       ${field('voucher_number', 'N.º comprobante', { value: prefill.voucher_number })}
       ${field('notes', 'Observaciones', { wide: true, value: prefill.notes })}</div>
+      ${prefill.replace_id ? '<div class="note" style="margin-top:12px">Cambie solo lo que esté mal. Al guardar, la compra original queda anulada y se registra la corregida (queda constancia en la auditoría).</div>' : ''}
       <div class="form-section">Productos comprados</div>
       <p class="small muted">Insumos, empaques y suministros ingresan al <b>inventario</b> (no son gasto hasta consumirse). Herramientas y moldes van a <b>activos</b>. Use "gasto directo" solo para lo que se consume en el acto.</p>
       <div id="lines"></div><div class="summary" style="margin-top:12px"><div><span>Total de la compra</span><b id="tot">S/ 0.00</b></div></div>
@@ -55,17 +56,17 @@ export async function purchaseForm(prefill = {}, onDone) {
     onSubmit: async (f, v) => {
       const lines = ed.get().filter(l => l.item_id || l.description || l.qty).map(l => ({ ...l, qty: num(l.qty), unit_price: num(l.unit_price), total: num(l.total) }));
       if (v.pay_status === 'credito') delete v.account_code;
-      const r = await post('/api/purchases', { ...v, lines });
-      toast('Compra registrada: inventario y caja actualizados', 'ok'); onDone ? onDone(r) : reload();
+      const r = prefill.replace_id ? await post(`/api/purchases/${prefill.replace_id}/replace`, { ...v, lines }) : await post('/api/purchases', { ...v, lines });
+      toast(prefill.replace_id ? 'Compra corregida' : 'Compra registrada: inventario y caja actualizados', 'ok'); onDone ? onDone(r) : reload();
     },
   });
   const cols = [
     { key: 'kind', label: 'Tipo', type: 'select', width: '130px', options: r => options([{ id: 'inventario', name: 'Inventario' }, { id: 'activo', name: 'Herramienta/activo' }, { id: 'gasto', name: 'Gasto directo' }], { selected: r.kind }) },
     { key: 'item_id', label: 'Insumo / descripción', type: 'select', cell: r => r.kind === 'inventario' ? null : `<input data-k="description" type="text" value="${esc(r.description || '')}" placeholder="${r.kind === 'activo' ? 'Escriba: Balanza, molde, bowl…' : 'Escriba qué compró'}">`, options: r => r.kind === 'inventario' ? options(items.filter(i => i.active), { empty: 'Seleccione…', selected: r.item_id, text: i => `${i.name} (${i.base_unit})` }) : '', onSet: (r, v) => { const it = byId(v); if (it && !r.unit) r.unit = it.pres_size ? 'pres' : it.base_unit; } },
-    { key: 'qty', label: 'Cantidad', type: 'number', width: '90px' },
+    { key: 'qty', label: 'Cantidad', type: 'number', width: '90px', onSet: r => { if (num(r.unit_price) !== null && num(r.qty)) r.total = Math.round(num(r.unit_price) * num(r.qty) * 100) / 100; } },
     { key: 'unit', label: 'Unidad', type: 'select', width: '110px', options: r => r.kind === 'inventario' ? unitOpts(byId(r.item_id), r.unit) : options([{ id: 'und', name: 'und' }]) },
-    { key: 'unit_price', label: 'P. unitario', type: 'number', width: '95px', placeholder: 'o importe' },
-    { key: 'total', label: 'Importe', type: 'number', width: '95px' },
+    { key: 'unit_price', label: 'P. unitario', type: 'number', width: '95px', placeholder: 'o importe', onSet: r => { r.total = num(r.unit_price) !== null && num(r.qty) ? Math.round(num(r.unit_price) * num(r.qty) * 100) / 100 : ''; } },
+    { key: 'total', label: 'Importe', type: 'number', width: '95px', onSet: r => { r.unit_price = ''; } },
     { key: 'expense_category', label: 'Cat. gasto', type: 'select', width: '120px', options: r => r.kind === 'gasto' ? catOptions(r.expense_category || 'operativo') : '<option value="">—</option>' },
     { label: 'Costo por unidad base', calc: r => { const it = byId(r.item_id); const t = num(r.total) ?? (num(r.unit_price) * num(r.qty)); const bq = num(r.qty) * unitFactor(it, r.unit); return r.kind === 'inventario' && it && t && bq ? `${money4(t / bq)}/${it.base_unit}` : ''; } },
   ];

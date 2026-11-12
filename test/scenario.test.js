@@ -233,3 +233,18 @@ test('datos demo: escenario completo cuadra y se eliminan antes de operar', () =
   assert.equal(db.get('SELECT SUM(stock_qty) s FROM items').s, 0);
   assert.ok(integrity(db).ok);
 });
+
+test('corregir compra: reemplaza la original aunque parte ya se haya usado, sin duplicar stock ni dinero', () => {
+  const { db, ctx, item } = fresh();
+  const id = item('Cobertura de chocolate').id;
+  const p1 = PU.createPurchase(db, ctx, { date: D, pay_status: 'pagado', account_code: '1101', lines: [{ kind: 'inventario', item_id: id, qty: 1, unit: 'kg', total: 16 }] });
+  INV.directConsumption(db, ctx, { date: D, item_id: id, qty: 300, destination: 'merma' });
+  // Se equivocó: eran 2 kg por S/ 30
+  const p2 = PU.replacePurchase(db, ctx, p1, { date: D, pay_status: 'pagado', account_code: '1101', lines: [{ kind: 'inventario', item_id: id, qty: 2, unit: 'kg', total: 30 }] });
+  assert.equal(db.get('SELECT status FROM purchases WHERE id=?', p1).status, 'anulada');
+  assert.equal(db.get('SELECT status FROM purchases WHERE id=?', p2).status, 'activa');
+  assert.equal(item('Cobertura de chocolate').stock_qty, 1700);
+  const cash = Object.fromEntries(FI.moneyBalances(db).map(x => [x.code, x.balance]));
+  close(cash['1101'], -30);
+  assert.ok(integrity(db).ok, JSON.stringify(integrity(db)));
+});

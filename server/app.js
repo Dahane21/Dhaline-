@@ -115,6 +115,7 @@ function createApp({ dbFile, backupDir }) {
   // ---------- Compras ----------
   route('GET', '/api/purchases', (c) => PU.listPurchases(db, c.query), read);
   route('POST', '/api/purchases', (c) => ({ id: PU.createPurchase(db, c, c.body) }));
+  route('POST', '/api/purchases/:id/replace', (c) => ({ id: PU.replacePurchase(db, c, id(c.params), c.body) }));
   route('POST', '/api/purchases/:id/annul', (c) => { PU.annulPurchase(db, c, id(c.params), c.body.reason); return { ok: true }; });
   route('GET', '/api/supplier-payments', () => db.all('SELECT p.*, s.name supplier FROM supplier_payments p LEFT JOIN suppliers s ON s.id=p.supplier_id ORDER BY p.id DESC'), read);
   route('POST', '/api/supplier-payments', (c) => ({ id: PU.paySupplier(db, c, c.body) }));

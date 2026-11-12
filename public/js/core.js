@@ -103,7 +103,11 @@ export function linesEditor(host, { columns, rows = [], blank = () => ({}), onCh
     const tr = e.target.closest('tr[data-i]'); if (!tr || !e.target.dataset.k) return;
     const r = data[tr.dataset.i]; const c = columns.find(x => x.key === e.target.dataset.k);
     r[e.target.dataset.k] = e.target.value;
-    if (c && c.onSet) c.onSet(r, e.target.value);
+    if (c && c.onSet) {
+      c.onSet(r, e.target.value);
+      // sincroniza otras casillas de la fila que onSet pudo recalcular (p. ej. importe)
+      tr.querySelectorAll('input[data-k]').forEach(inp => { if (inp !== e.target) { const nv = r[inp.dataset.k] ?? ''; if (inp.value !== String(nv)) inp.value = nv; } });
+    }
     if (e.type === 'input' && e.target.tagName === 'SELECT') return;
     tr.querySelectorAll('td.calc').forEach((td) => { const cc = columns.filter(x => x.calc)[[...tr.querySelectorAll('td.calc')].indexOf(td)]; td.innerHTML = cc.calc(r); });
     onChange(data);

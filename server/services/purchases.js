@@ -122,4 +122,19 @@ function paySupplier(db, ctx, b) {
   });
 }
 
-module.exports = { createPurchase, annulPurchase, listPurchases, paySupplier, nextCode };
+/**
+ * Corrección de una compra: registra la versión corregida y anula la original en una sola transacción.
+ * Primero se registra la nueva (así el stock alcanza para retirar la original aunque parte ya se haya usado).
+ */
+function replacePurchase(db, ctx, oldId, b) {
+  return db.tx(() => {
+    const old = db.get('SELECT * FROM purchases WHERE id=?', oldId);
+    if (!old || old.status !== 'activa') throw bad('La compra no existe o ya fue anulada.');
+    const nid = createPurchase(db, ctx, { ...b, is_demo: old.is_demo });
+    const code = db.get('SELECT code FROM purchases WHERE id=?', nid).code;
+    annulPurchase(db, ctx, oldId, `Corregida: reemplazada por ${code}${b.reason ? ' — ' + b.reason : ''}`);
+    return nid;
+  });
+}
+
+module.exports = { createPurchase, replacePurchase, annulPurchase, listPurchases, paySupplier, nextCode };
