@@ -61,8 +61,7 @@ export async function purchaseForm(prefill = {}, onDone) {
   });
   const cols = [
     { key: 'kind', label: 'Tipo', type: 'select', width: '130px', options: r => options([{ id: 'inventario', name: 'Inventario' }, { id: 'activo', name: 'Herramienta/activo' }, { id: 'gasto', name: 'Gasto directo' }], { selected: r.kind }) },
-    { key: 'item_id', label: 'Insumo / descripción', type: 'select', options: r => r.kind === 'inventario' ? options(items.filter(i => i.active), { empty: 'Seleccione…', selected: r.item_id, text: i => `${i.name} (${i.base_unit})` }) : '', onSet: (r, v) => { const it = byId(v); if (it && !r.unit) r.unit = it.pres_size ? 'pres' : it.base_unit; } },
-    { key: 'description', label: 'Descripción', placeholder: 'Para activos o gastos' },
+    { key: 'item_id', label: 'Insumo / descripción', type: 'select', cell: r => r.kind === 'inventario' ? null : `<input data-k="description" type="text" value="${esc(r.description || '')}" placeholder="${r.kind === 'activo' ? 'Escriba: Balanza, molde, bowl…' : 'Escriba qué compró'}">`, options: r => r.kind === 'inventario' ? options(items.filter(i => i.active), { empty: 'Seleccione…', selected: r.item_id, text: i => `${i.name} (${i.base_unit})` }) : '', onSet: (r, v) => { const it = byId(v); if (it && !r.unit) r.unit = it.pres_size ? 'pres' : it.base_unit; } },
     { key: 'qty', label: 'Cantidad', type: 'number', width: '90px' },
     { key: 'unit', label: 'Unidad', type: 'select', width: '110px', options: r => r.kind === 'inventario' ? unitOpts(byId(r.item_id), r.unit) : options([{ id: 'und', name: 'und' }]) },
     { key: 'unit_price', label: 'P. unitario', type: 'number', width: '95px', placeholder: 'o importe' },

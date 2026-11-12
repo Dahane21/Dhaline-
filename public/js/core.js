@@ -92,6 +92,7 @@ export function linesEditor(host, { columns, rows = [], blank = () => ({}), onCh
       ${data.map((r, i) => `<tr data-i="${i}">${columns.map(c => {
         if (c.calc) return `<td class="calc">${c.calc(r)}</td>`;
         const v = r[c.key] ?? '';
+        if (c.cell) { const h = c.cell(r); if (h !== null) return `<td>${h}</td>`; }
         if (c.type === 'select') return `<td><select data-k="${c.key}">${c.options(r)}</select></td>`;
         return `<td><input data-k="${c.key}" type="${c.type || 'text'}" ${c.type === 'number' ? 'step="any"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}"></td>`;
       }).join('')}<td><button type="button" class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td></tr>`).join('')}
