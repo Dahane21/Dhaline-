@@ -62,9 +62,18 @@ function renderShell() {
       <nav class="nav">${NAV.map(([g, items]) => `<div class="nav-group">${esc(g)}</div>${items.map(([k, l, ic]) => `<a href="#/${k}" data-nav="${k}">${ICONS[ic]}<span>${esc(l)}</span>${k === 'alertas' ? '<span class="badge" id="alert-count" hidden></span>' : ''}</a>`).join('')}`).join('')}</nav>
       <div class="nav-group">Sesión</div><div class="small muted" style="padding:0 10px">${esc(u.name)} · ${esc(u.role)}</div>
       <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="theme">Tema</button>${window.CBM_LOCAL ? '' : '<button class="btn sm" id="logout">Salir</button>'}</div>
-    </aside><main class="main"><div class="topbar"><button class="btn menu-btn" id="menu" aria-label="Menú">${ICONS.menu}</button><div class="spacer"></div><a class="btn primary" href="#/rapido">${ICONS.bolt} Registro rápido</a></div><div id="view"></div></main></div>`;
+    </aside><div class="scrim" id="scrim" hidden></div><main class="main"><div class="topbar"><button class="btn menu-btn" id="menu" aria-label="Abrir menú">${ICONS.menu}</button>
+      <div class="app-title"><div class="brand-mark">D</div>${esc(state.meta.settings.company_name || 'Dhaline')}</div><div class="spacer"></div><a class="btn gold quick-top" href="#/rapido">${ICONS.bolt} Registro rápido</a></div><div id="view"></div></main>
+      <nav class="bnav" aria-label="Accesos rápidos">
+        <a href="#/dashboard" data-bnav="dashboard">${ICONS.home}<span>Inicio</span></a>
+        <a href="#/ventas" data-bnav="ventas">${ICONS.bag}<span>Ventas</span></a>
+        <a href="#/rapido" class="fab" data-bnav="rapido" aria-label="Registro rápido"><span class="circle">${ICONS.bolt}</span><span>Registrar</span></a>
+        <a href="#/terminados" data-bnav="terminados">${ICONS.star}<span>Stock</span></a>
+        <button type="button" id="bmenu">${ICONS.menu}<span>Más</span></button>
+      </nav></div>`;
   if ($('#logout')) $('#logout').onclick = async () => { await post('/api/auth/logout'); location.hash = ''; location.reload(); };
-  $('#menu').onclick = () => $('#side').classList.toggle('open');
+  const toggleMenu = (open) => { const o = open ?? !$('#side').classList.contains('open'); $('#side').classList.toggle('open', o); $('#scrim').hidden = !o; };
+  $('#menu').onclick = () => toggleMenu(); $('#bmenu').onclick = () => toggleMenu(); $('#scrim').onclick = () => toggleMenu(false);
   const saved = (() => { try { return localStorage.getItem('cbm-theme'); } catch { return null; } })();
   if (saved) document.documentElement.dataset.theme = saved;
   $('#theme').onclick = () => {
@@ -83,13 +92,18 @@ async function route() {
   const [name, ...rest] = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/');
   const key = VIEWS[name] ? name : 'dashboard';
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === key));
-  $('#side')?.classList.remove('open');
+  document.querySelectorAll('[data-bnav]').forEach(a => a.classList.toggle('active', a.dataset.bnav === key));
+  $('#side')?.classList.remove('open'); if ($('#scrim')) $('#scrim').hidden = true;
   destroyCharts();
   const view = $('#view'); view.innerHTML = '<div class="empty">Cargando…</div>';
   try {
     const mod = await VIEWS[key]();
     await mod.render(view, rest);
     const title = NAV.flatMap(g => g[1]).find(n => n[0] === key)?.[1];
+    // Etiqueta de sección (grupo del menú) sobre el título de la pantalla
+    const group = NAV.find(g => g[1].some(n => n[0] === key))?.[0];
+    const head = view.querySelector('.page-head > div:first-child');
+    if (head && group && !head.querySelector('.eyebrow')) head.insertAdjacentHTML('afterbegin', `<span class="eyebrow">${esc(group)}</span>`);
     document.title = `${title} · Chocolate Business Manager`;
   } catch (e) { console.error(e); view.innerHTML = `<div class="note bad">No se pudo cargar la pantalla: ${esc(e.message)}</div>`; }
   refreshAlerts();

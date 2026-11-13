@@ -58,7 +58,7 @@ function createApp({ dbFile, backupDir }) {
     const url = new URL(req.url, 'http://x');
     const cookies = Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
     const secure = req.headers['x-forwarded-proto'] === 'https';
-    const headers = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'" };
+    const headers = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'none'" };
     if (!url.pathname.startsWith('/api/')) return serveStatic(url.pathname, res, headers);
     const ctx = { query: Object.fromEntries(url.searchParams), params: {}, ip: req.socket.remoteAddress, token: cookies.cbm_session, cookie: null };
     ctx.setCookie = (tok, clear) => { ctx.cookie = `cbm_session=${tok}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${clear ? 0 : 30 * 86400}${secure ? '; Secure' : ''}`; };

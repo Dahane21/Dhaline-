@@ -33,6 +33,9 @@ const safe = js => js.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\
   const css = fs.readFileSync(path.join(root, 'public', 'css', 'app.css'), 'utf8').replace(/[^\x00-\x7f]/g, c => '\\' + c.codePointAt(0).toString(16) + ' ');
   const html = `<title>Dhaline &middot; Gesti&oacute;n</title>
 <meta name="description" content="Compras, inventario, producci&oacute;n, ventas y finanzas de Dhaline.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&family=Fraunces:opsz,wght@9..144,500..700&display=swap">
 <style>${css}</style>
 <div id="root"><div class="empty">Cargando&hellip;</div></div>
 <script>${safe(sql)}</script>
