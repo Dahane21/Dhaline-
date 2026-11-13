@@ -166,16 +166,19 @@ export async function saleForm(sale = {}, onDone) {
     body: `<div class="form-grid">
       ${field('date', 'Fecha', { type: 'date', value: sale.date || today(), required: true })}
       ${field('customer_id', 'Cliente', { type: 'select', opts: options(customers, { empty: '— Sin cliente —', selected: sale.customer_id }) })}
+      ${!isEdit ? field('status', 'Estado', { type: 'select', opts: options(state.meta.statuses.filter(s => s !== 'cancelado').map(s => ({ id: s, name: label(s) })), { selected: sale.status || 'entregado' }), help: 'Entregado o Listo descuentan stock; Pendiente es un pedido por preparar' }) : ''}</div>
+      <div class="form-section">Productos</div><div id="lines"></div>
+      ${!isEdit ? `<div class="form-section">Cobro</div><div class="form-grid">${field('pay_amount', 'Monto cobrado ahora', { type: 'number', value: sale.payment?.amount ?? '' })}${field('pay_account', 'Medio', { type: 'select', opts: moneyOptions(sale.payment?.account_code || '1102') })}</div>
+        <div style="margin-top:8px"><button type="button" class="btn sm" id="pay-all">Cobrado completo</button></div>` : ''}
+      <details class="more" ${sale.discount || sale.delivery_charge || sale.delivery_cost || sale.channel || sale.campaign_id || sale.notes ? 'open' : ''}><summary>Más opciones: canal, campaña, descuento, delivery, notas</summary><div class="form-grid">
       ${field('channel', 'Canal', { type: 'select', opts: options(channels.map(c => ({ id: c, name: c })), { empty: '—', selected: sale.channel }) })}
       ${field('campaign_id', 'Campaña', { type: 'select', opts: options(campaigns, { empty: '— Ninguna —', selected: sale.campaign_id }) })}
-      ${!isEdit ? field('status', 'Estado', { type: 'select', opts: options(state.meta.statuses.filter(s => s !== 'cancelado').map(s => ({ id: s, name: label(s) })), { selected: sale.status || 'pendiente' }), help: 'Listo/Entregado descuenta stock y registra la venta' }) : ''}
       ${field('discount', 'Descuento del pedido (S/)', { type: 'number', value: sale.discount || 0 })}
       ${field('delivery_charge', 'Delivery cobrado al cliente', { type: 'number', value: sale.delivery_charge || 0 })}
       ${field('delivery_cost', 'Delivery pagado por el negocio', { type: 'number', value: sale.delivery_cost || 0, help: 'Se registra como gasto al entregar' })}
       ${field('delivery_account', 'Delivery pagado con', { type: 'select', opts: moneyOptions(sale.delivery_account || '1101') })}
-      ${field('notes', 'Notas', { wide: true, value: sale.notes })}</div>
-      <div class="form-section">Productos</div><div id="lines"></div>
-      ${!isEdit ? `<div class="form-section">Cobro (opcional)</div><div class="form-grid">${field('pay_amount', 'Monto cobrado ahora', { type: 'number', value: sale.payment?.amount ?? '' })}${field('pay_account', 'Medio', { type: 'select', opts: moneyOptions(sale.payment?.account_code || '1102') })}${field('pay_commission', 'Comisión del medio', { type: 'number', value: 0 })}</div>` : ''}
+      ${!isEdit ? field('pay_commission', 'Comisión del medio de pago', { type: 'number', value: 0 }) : ''}
+      ${field('notes', 'Notas', { wide: true, value: sale.notes })}</div></details>
       <div class="summary" style="margin-top:12px" id="sum"></div>`,
     onSubmit: async (f, v) => {
       const body = { ...v, lines: ed.get().filter(l => l.product_id || l.presentation_id).map(l => ({ ...l, qty: num(l.qty), unit_price: num(l.unit_price), discount: num(l.discount) || 0 })) };
@@ -212,6 +215,11 @@ export async function saleForm(sale = {}, onDone) {
       ${below.length ? '<div class="note warn" style="grid-column:1/-1">Hay líneas con precio menor al de lista: se registrarán como precio pactado.</div>' : ''}`;
   };
   f.addEventListener('input', summary); summary();
+  f.querySelector('#pay-all')?.addEventListener('click', () => {
+    const rows = ed.get(); const sub = rows.reduce((t, r) => t + (num(r.qty) || 0) * (num(r.unit_price) || 0) - (num(r.discount) || 0), 0);
+    const tot = sub - (num(f.querySelector('[name=discount]').value) || 0) + (num(f.querySelector('[name=delivery_charge]').value) || 0);
+    f.querySelector('[name=pay_amount]').value = Math.round(tot * 100) / 100;
+  });
   return ctl;
 }
 

@@ -97,12 +97,12 @@ export function linesEditor(host, { columns, rows = [], blank = () => ({}), onCh
   const render = () => {
     host.innerHTML = `<div class="table-wrap"><table class="lines"><thead><tr>${columns.map(c => `<th style="${c.width ? `width:${c.width}` : ''}">${esc(c.label)}</th>`).join('')}<th></th></tr></thead><tbody>
       ${data.map((r, i) => `<tr data-i="${i}">${columns.map(c => {
-        if (c.calc) return `<td class="calc">${c.calc(r)}</td>`;
+        if (c.calc) return `<td class="calc" data-label="${esc(c.label)}">${c.calc(r)}</td>`;
         const v = r[c.key] ?? '';
-        if (c.cell) { const h = c.cell(r); if (h !== null) return `<td>${h}</td>`; }
-        if (c.type === 'select') return `<td><select data-k="${c.key}">${c.options(r)}</select></td>`;
-        return `<td><input data-k="${c.key}" type="${c.type || 'text'}" ${c.type === 'number' ? 'step="any"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}"></td>`;
-      }).join('')}<td><button type="button" class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td></tr>`).join('')}
+        if (c.cell) { const h = c.cell(r); if (h !== null) return `<td data-label="${esc(c.label)}">${h}</td>`; }
+        if (c.type === 'select') return `<td class="sel" data-label="${esc(c.label)}"><select data-k="${c.key}">${c.options(r)}</select></td>`;
+        return `<td data-label="${esc(c.label)}"><input data-k="${c.key}" type="${c.type || 'text'}" ${c.type === 'number' ? 'step="any"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}"></td>`;
+      }).join('')}<td class="del"><button type="button" class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td></tr>`).join('')}
     </tbody></table></div><button type="button" class="btn sm" data-add>+ ${esc(addLabel)}</button>`;
   };
   render();

@@ -44,7 +44,9 @@
   let pill;
   function setStatus(kind, text) {
     if (!pill) { pill = document.createElement('div'); pill.className = 'save-pill'; pill.setAttribute('role', 'status'); document.body.appendChild(pill); }
-    pill.dataset.kind = kind; pill.textContent = text;
+    pill.dataset.kind = kind; pill.textContent = text; pill.hidden = false;
+    clearTimeout(pill._t);
+    if (kind === 'ok') pill._t = setTimeout(() => { pill.hidden = true; }, 3000); // el aviso de "guardado" se oculta solo
   }
 
   async function main() {
