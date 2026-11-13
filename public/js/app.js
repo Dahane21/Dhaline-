@@ -61,9 +61,9 @@ function renderShell() {
       <div class="brand"><div class="brand-mark">D</div><div><b>${esc(state.meta.settings.company_name || 'Dhaline')}</b><span>Chocolate Business Manager</span></div></div>
       <nav class="nav">${NAV.map(([g, items]) => `<div class="nav-group">${esc(g)}</div>${items.map(([k, l, ic]) => `<a href="#/${k}" data-nav="${k}">${ICONS[ic]}<span>${esc(l)}</span>${k === 'alertas' ? '<span class="badge" id="alert-count" hidden></span>' : ''}</a>`).join('')}`).join('')}</nav>
       <div class="nav-group">Sesión</div><div class="small muted" style="padding:0 10px">${esc(u.name)} · ${esc(u.role)}</div>
-      <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="theme">Tema</button><button class="btn sm" id="logout">Salir</button></div>
+      <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="theme">Tema</button>${window.CBM_LOCAL ? '' : '<button class="btn sm" id="logout">Salir</button>'}</div>
     </aside><main class="main"><div class="topbar"><button class="btn menu-btn" id="menu" aria-label="Menú">${ICONS.menu}</button><div class="spacer"></div><a class="btn primary" href="#/rapido">${ICONS.bolt} Registro rápido</a></div><div id="view"></div></main></div>`;
-  $('#logout').onclick = async () => { await post('/api/auth/logout'); location.hash = ''; location.reload(); };
+  if ($('#logout')) $('#logout').onclick = async () => { await post('/api/auth/logout'); location.hash = ''; location.reload(); };
   $('#menu').onclick = () => $('#side').classList.toggle('open');
   const saved = (() => { try { return localStorage.getItem('cbm-theme'); } catch { return null; } })();
   if (saved) document.documentElement.dataset.theme = saved;
@@ -96,4 +96,4 @@ async function route() {
 }
 export const reload = () => route();
 window.addEventListener('cbm:reload', route);
-boot().catch(e => { $('#root').innerHTML = `<div class="note bad" style="margin:20px">Error al iniciar: ${esc(e.message)}</div>`; toast(e.message, 'bad'); });
+(window.CBM_LOCAL_READY || Promise.resolve()).then(boot).catch(e => { $('#root').innerHTML = `<div class="note bad" style="margin:20px">Error al iniciar: ${esc(e.message)}</div>`; toast(e.message, 'bad'); });

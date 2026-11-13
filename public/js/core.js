@@ -1,7 +1,14 @@
 // Utilidades de interfaz: API, formato, tablas, formularios, modales y editores de líneas.
 export const state = { meta: null, user: null, cache: {} };
 
+export const isLocal = () => !!window.CBM_LOCAL;
 export async function api(path, { method = 'GET', body } = {}) {
+  if (window.CBM_LOCAL) {
+    // Versión para celular: la API corre dentro del navegador
+    const r = await window.CBM_LOCAL.request(method, path, body);
+    if (r.error) { const err = new Error(r.error); err.detail = r.detail; throw err; }
+    return r.data;
+  }
   const res = await fetch(path, { method, headers: body !== undefined ? { 'Content-Type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
   let data = null;
   try { data = await res.json(); } catch { /* sin cuerpo */ }

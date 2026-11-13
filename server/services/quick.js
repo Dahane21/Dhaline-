@@ -16,10 +16,10 @@ const UNIT_WORDS = [
   [/^(bolsa|bolsas|paquete|paquetes|sobre|sobres|presentacion|presentaciones)$/, 'pres'],
 ];
 
-function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
 function singular(w) { if (w.length > 4 && w.endsWith('es') && !w.endsWith('ces')) return w.slice(0, -2); if (w.endsWith('ces')) return w.slice(0, -3) + 'z'; if (w.length > 3 && w.endsWith('s')) return w.slice(0, -1); return w; }
 const STOP = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para', 'con', 'y', 'a', 'en', 'por', 'un', 'una', 'mi', 'el', 'emprendimiento']);
-function tokens(s) { return norm(s).split(/[^a-z0-9ñ]+/).filter(t => t && !STOP.has(t)).map(singular); }
+function tokens(s) { return norm(s).split(/[^a-z0-9\u00f1]+/).filter(t => t && !STOP.has(t)).map(singular); }
 
 function parseNumber(t) {
   if (t === undefined) return null;
@@ -71,7 +71,7 @@ function clauses(text) {
 
 /** "2 kg de cobertura a s/ 32" → { qty, unit, name, price, priceMode } */
 function parseQtyPhrase(c) {
-  let s = c.replace(/^(hoy|ayer|anteayer)\s+/, '').replace(/^(compre|use|utilice|ocupe|gaste|vendi|consumi|empleé|emplee)\s+/, '').replace(/\b(hoy|ayer)\b/g, '').trim();
+  let s = c.replace(/^(hoy|ayer|anteayer)\s+/, '').replace(/^(compre|use|utilice|ocupe|gaste|vendi|consumi|emple\u00e9|emplee)\s+/, '').replace(/\b(hoy|ayer)\b/g, '').trim();
   let price = null, priceMode = null;
   const pm = s.match(/\s(a|por|en)\s+(s\/\.?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*soles?)(\s+(c\/u|cada\s+un[oa]|la\s+unidad|el\s+(kg|kilo|metro)|por\s+(kg|kilo|unidad|metro)))?/);
   if (pm) {
@@ -260,7 +260,7 @@ function parse(db, text) {
 
 function cap(s) { s = String(s || '').trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
 function singularPhrase(s) { return s.split(' ').map((w, i) => i === 0 ? singular(w) : w.replace(/(as|os)$/, m => m[0])).join(' '); }
-function guessType(n) { return /\b(caja|bolsa|cinta|lazo|sticker|etiqueta|tarjeta|papel|acetato|pirulina|envoltura|moño|celofan)/.test(n) ? 'empaque' : /\b(guante|gorro|servilleta|film|aluminio|detergente|gas)/.test(n) ? 'suministro' : 'materia_prima'; }
+function guessType(n) { return /\b(caja|bolsa|cinta|lazo|sticker|etiqueta|tarjeta|papel|acetato|pirulina|envoltura|mo\u00f1o|celofan)/.test(n) ? 'empaque' : /\b(guante|gorro|servilleta|film|aluminio|detergente|gas)/.test(n) ? 'suministro' : 'materia_prima'; }
 function guessBase(u, n) { if (u === 'kg' || u === 'g') return 'g'; if (u === 'l' || u === 'ml') return 'ml'; if (u === 'm' || u === 'cm' || /\b(cinta|lazo)/.test(n)) return 'm'; return 'und'; }
 function mapUnit(it, u) {
   const ok = { g: ['g', 'kg'], ml: ['ml', 'l'], und: ['und', 'docena', 'ciento'], m: ['m', 'cm'] }[it.base_unit] || [];

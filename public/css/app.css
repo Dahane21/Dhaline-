@@ -184,3 +184,10 @@ textarea { min-height: 70px; resize: vertical; }
   h1 { font-size: 22px; }
 }
 @media print { .side, .topbar, .page-head .actions, .btn { display: none !important; } .shell { display: block; } .card { box-shadow: none; break-inside: avoid; } }
+
+/* Indicador de guardado (versión celular) */
+.save-pill { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 55; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-2); color: var(--ink-2); box-shadow: var(--shadow); }
+.save-pill[data-kind="ok"] { color: var(--ok); }
+.save-pill[data-kind="warn"] { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+.save-pill[data-kind="bad"] { color: var(--bad); background: var(--bad-bg); border-color: transparent; }
+@media (max-width: 860px) { .save-pill { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); } }

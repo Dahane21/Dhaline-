@@ -4,15 +4,22 @@
   "description": "Chocolate Business Manager – ERP de compras, inventario, producción, ventas y finanzas para Dhaline",
   "private": true,
   "type": "commonjs",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
-    "postinstall": "node scripts/vendor.js"
+    "postinstall": "node scripts/vendor.js",
+    "build:mobile": "node scripts/build-mobile.js"
   },
   "dependencies": {
     "chart.js": "4.4.6",
     "exceljs": "4.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "sql.js": "^1.12.0"
   }
 }
