@@ -261,3 +261,18 @@ details.more[open] summary { margin-bottom: 12px; }
   .lines input, .lines select { font-size: 16px; }
   .modal .form-grid { grid-template-columns: 1fr; }
 }
+
+/* Pendientes */
+.bn-pend { position: relative; }
+.bn-count { position: absolute; top: 0; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--brand); color: var(--brand-ink); font: 700 10.5px/18px var(--font); font-style: normal; text-align: center; }
+.pend-list { display: grid; gap: 10px; }
+.pend { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--gold-bright); border-radius: 12px; background: var(--surface); }
+.pend.debt { border-left-color: var(--brand); }
+.pend.late { border-left-color: var(--bad); }
+.pend .who { font-weight: 700; font-size: 15px; }
+.pend .what { font-size: 13px; color: var(--ink-2); }
+.pend .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pend .amt { text-align: right; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.pend .amt small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+.pend .acts { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 640px) { .pend .acts .btn { flex: 1; justify-content: center; padding: 9px 10px; } }

@@ -11,16 +11,17 @@ const ICONS = {
   file: I('<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>'), bell: I('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>'),
   gear: I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
   menu: I('<path d="M3 6h18M3 12h18M3 18h18"/>'),
+  clock: I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
 };
 
 const NAV = [
-  ['Principal', [['dashboard', 'Dashboard', 'home'], ['rapido', 'Registro rápido', 'bolt'], ['alertas', 'Alertas', 'bell']]],
+  ['Principal', [['dashboard', 'Dashboard', 'home'], ['pendientes', 'Pendientes', 'clock'], ['rapido', 'Registro rápido', 'bolt'], ['alertas', 'Alertas', 'bell']]],
   ['Operación', [['compras', 'Compras', 'cart'], ['inventario', 'Inventario', 'box'], ['produccion', 'Producción', 'pot'], ['terminados', 'Productos terminados', 'star'], ['presentaciones', 'Presentaciones y cajas', 'gift'], ['ventas', 'Ventas y pedidos', 'bag'], ['clientes', 'Clientes', 'users']]],
   ['Finanzas', [['finanzas', 'Caja, gastos y socias', 'wallet'], ['rentabilidad', 'Rentabilidad', 'chart'], ['equilibrio', 'Punto de equilibrio', 'target'], ['reportes', 'Reportes', 'file']]],
   ['Sistema', [['configuracion', 'Configuración', 'gear']]],
 ];
 const VIEWS = {
-  dashboard: () => import('./views/dashboard.js'), rapido: () => import('./views/quick.js'), alertas: () => import('./views/alerts.js'),
+  dashboard: () => import('./views/dashboard.js'), pendientes: () => import('./views/pending.js'), rapido: () => import('./views/quick.js'), alertas: () => import('./views/alerts.js'),
   compras: () => import('./views/purchases.js'), inventario: () => import('./views/inventory.js'), produccion: () => import('./views/production.js'),
   terminados: () => import('./views/finished.js'), presentaciones: () => import('./views/presentations.js'), ventas: () => import('./views/sales.js'),
   clientes: () => import('./views/customers.js'), finanzas: () => import('./views/finance.js'), rentabilidad: () => import('./views/profitability.js'),
@@ -59,7 +60,7 @@ function renderShell() {
   const u = state.user;
   $('#root').innerHTML = `<div class="shell"><aside class="side" id="side">
       <div class="brand"><div class="brand-mark">D</div><div><b>${esc(state.meta.settings.company_name || 'Dhaline')}</b><span>Chocolate Business Manager</span></div></div>
-      <nav class="nav">${NAV.map(([g, items]) => `<div class="nav-group">${esc(g)}</div>${items.map(([k, l, ic]) => `<a href="#/${k}" data-nav="${k}">${ICONS[ic]}<span>${esc(l)}</span>${k === 'alertas' ? '<span class="badge" id="alert-count" hidden></span>' : ''}</a>`).join('')}`).join('')}</nav>
+      <nav class="nav">${NAV.map(([g, items]) => `<div class="nav-group">${esc(g)}</div>${items.map(([k, l, ic]) => `<a href="#/${k}" data-nav="${k}">${ICONS[ic]}<span>${esc(l)}</span>${k === 'alertas' ? '<span class="badge" id="alert-count" hidden></span>' : k === 'pendientes' ? '<span class="badge warn" id="pend-count" hidden></span>' : ''}</a>`).join('')}`).join('')}</nav>
       <div class="nav-group">Sesión</div><div class="small muted" style="padding:0 10px">${esc(u.name)} · ${esc(u.role)}</div>
       <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="theme">Tema</button>${window.CBM_LOCAL ? '' : '<button class="btn sm" id="logout">Salir</button>'}</div>
     </aside><div class="scrim" id="scrim" hidden></div><main class="main"><div class="topbar"><button class="btn menu-btn" id="menu" aria-label="Abrir menú">${ICONS.menu}</button>
@@ -68,7 +69,7 @@ function renderShell() {
         <a href="#/dashboard" data-bnav="dashboard">${ICONS.home}<span>Inicio</span></a>
         <a href="#/ventas" data-bnav="ventas">${ICONS.bag}<span>Ventas</span></a>
         <a href="#/rapido" class="fab" data-bnav="rapido" aria-label="Registro rápido"><span class="circle">${ICONS.bolt}</span><span>Registrar</span></a>
-        <a href="#/terminados" data-bnav="terminados">${ICONS.star}<span>Stock</span></a>
+        <a href="#/pendientes" data-bnav="pendientes" class="bn-pend">${ICONS.clock}<span>Pendientes</span><i class="bn-count" id="pend-count-b" hidden></i></a>
         <button type="button" id="bmenu">${ICONS.menu}<span>Más</span></button>
       </nav></div>`;
   if ($('#logout')) $('#logout').onclick = async () => { await post('/api/auth/logout'); location.hash = ''; location.reload(); };
@@ -85,6 +86,11 @@ function renderShell() {
   refreshAlerts();
 }
 export async function refreshAlerts() {
+  try {
+    const s = await get('/api/sales?from=2000-01-01');
+    const n = s.filter(x => x.status !== 'cancelado' && (['pendiente', 'preparacion', 'listo'].includes(x.status) || x.balance > 0.009)).length;
+    for (const id of ['pend-count', 'pend-count-b']) { const el = $('#' + id); if (el) { el.hidden = !n; el.textContent = n; } }
+  } catch { /* opcional */ }
   try { const a = await get('/api/alerts'); const el = $('#alert-count'); if (el) { el.hidden = !a.length; el.textContent = a.length; el.className = 'badge ' + (a.some(x => x.level === 'alta') ? 'bad' : 'warn'); } } catch { /* opcional */ }
 }
 
