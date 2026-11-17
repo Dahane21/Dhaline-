@@ -267,3 +267,20 @@ test('cambiar tipo de insumo con stock reclasifica su valor sin descuadrar', () 
   const ig = integrity(db); assert.ok(ig.ok, JSON.stringify(ig));
   close(ig.checks.find(c => c.name.startsWith('Empaques')).ledger, 1.5);
 });
+
+test('corrección: anular devolución por error y volver de Entregado a Listo', () => {
+  const env = fresh(); const { db, ctx, prod, q } = env; produce(env);
+  const sid = S.createSale(db, ctx, { date: D, status: 'entregado', delivery_cost: 3, delivery_account: '1101', lines: [{ kind: 'producto', product_id: prod('Chocoteja de pecanas'), quality_id: q('A'), qty: 1, unit_price: 1.5 }] });
+  const line = S.saleDetail(db, sid).lines[0];
+  const rid = S.addReturn(db, ctx, sid, { date: D, line_id: line.id, qty: 1, amount: 0, restock: false });
+  close(R.incomeStatement(db, monthRange(D.slice(0, 7))).waste, 13.24 / 28);
+  S.annulReturn(db, ctx, rid, 'error');
+  const is = R.incomeStatement(db, monthRange(D.slice(0, 7)));
+  close(is.waste, 0); close(is.cogs, 13.24 / 28);
+  assert.equal(S.saleDetail(db, sid).lines[0].returned_qty, 0);
+  S.setStatus(db, ctx, sid, 'listo');
+  const s = S.saleDetail(db, sid);
+  assert.equal(s.status, 'listo'); assert.equal(s.delivery_expense_id, null);
+  close(R.incomeStatement(db, monthRange(D.slice(0, 7))).opex.find(o => o.code === '6104').amount, 0); // gasto de delivery anulado
+  assert.ok(integrity(db).ok);
+});

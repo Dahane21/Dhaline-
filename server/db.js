@@ -6,7 +6,7 @@ const path = require('path');
 
 const SCHEMA_VERSION = 1;
 
-const { SCHEMA } = require('./schema');
+const { SCHEMA, migrate } = require('./schema');
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -19,6 +19,7 @@ class Db {
     this.conn.exec(SCHEMA);
     this.depth = 0;
     this.cache = new Map();
+    migrate(this);
     const v = this.get("SELECT value FROM settings WHERE key='schema_version'");
     if (!v) this.run("INSERT INTO settings(key,value) VALUES('schema_version',?)", String(SCHEMA_VERSION));
   }

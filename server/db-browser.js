@@ -1,6 +1,6 @@
 'use strict';
 // Misma interfaz que server/db.js, pero sobre sql.js (SQLite compilado a JavaScript) para correr dentro del navegador.
-const { SCHEMA } = require('./schema');
+const { SCHEMA, migrate } = require('./schema');
 
 function nowIso() { return new Date().toISOString(); }
 function norm(v) { if (v === undefined) return null; if (typeof v === 'boolean') return v ? 1 : 0; return v; }
@@ -12,6 +12,7 @@ class Db {
     this.conn.exec(SCHEMA);
     this.depth = 0;
     this.cache = new Map();
+    migrate(this);
     if (!this.get("SELECT value FROM settings WHERE key='schema_version'")) this.run("INSERT INTO settings(key,value) VALUES('schema_version','1')");
   }
   stmt(sql) { let s = this.cache.get(sql); if (!s) { s = this.conn.prepare(sql); this.cache.set(sql, s); } return s; }

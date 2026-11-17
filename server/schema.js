@@ -222,4 +222,15 @@ CREATE TABLE IF NOT EXISTS fixed_costs (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, monthly_amount REAL NOT NULL, active INTEGER NOT NULL DEFAULT 1,
   is_demo INTEGER NOT NULL DEFAULT 0);
 `;
-module.exports = { SCHEMA };
+// Columnas agregadas después de la primera versión (se añaden a bases existentes al abrir).
+const MIGRATIONS = [
+  ['sale_returns', 'status', "TEXT NOT NULL DEFAULT 'activo'"],
+  ['sale_returns', 'annul_reason', 'TEXT'],
+];
+function migrate(db) {
+  for (const [table, col, ddl] of MIGRATIONS) {
+    const cols = db.all(`PRAGMA table_info(${table})`).map(c => c.name);
+    if (!cols.includes(col)) db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
+  }
+}
+module.exports = { SCHEMA, migrate };

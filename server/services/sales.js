@@ -157,6 +157,7 @@ function setStatus(db, ctx, id, status, { date, allow_negative, reason } = {}) {
     if (status === s.status) return;
     const d = date || s.date;
     if (status === 'cancelado') return cancelSale(db, ctx, s, reason);
+    if (s.status === 'entregado' && status === 'listo') return backToReady(db, ctx, s);
     if (s.status === 'entregado') throw bad('El pedido ya fue entregado; para corregirlo registre una devolución.');
     if (FULFILL.includes(status) && !s.fulfilled) fulfill(db, { ...ctx, allowNegative: !!allow_negative }, s, s.date, allow_negative);
     if (!FULFILL.includes(status) && s.fulfilled) throw bad('El pedido ya fue despachado (inventario descontado). Para revertir, cancélelo.');
@@ -170,6 +171,43 @@ function setStatus(db, ctx, id, status, { date, allow_negative, reason } = {}) {
     }
     db.update('sales', id, upd);
     audit(db, ctx, 'estado', 'venta', id, { from: s.status, to: status });
+  });
+}
+
+/** Corrige un pedido marcado como Entregado por error: vuelve a Listo (sigue despachado; se anula el gasto de delivery si lo hubo). */
+function backToReady(db, ctx, s) {
+  if (s.delivery_expense_id) {
+    const E = require('./finance');
+    const ex = db.get('SELECT status FROM expenses WHERE id=?', s.delivery_expense_id);
+    if (ex && ex.status === 'activo') E.annul(db, ctx, 'gasto', s.delivery_expense_id, `Pedido ${s.code} vuelto a Listo`);
+  }
+  db.update('sales', s.id, { status: 'listo', delivered_at: null, delivery_expense_id: null });
+  audit(db, ctx, 'estado', 'venta', s.id, { from: 'entregado', to: 'listo', correccion: true });
+}
+
+/** Anula una devolución registrada por error: revierte su asiento y, si reingresó stock, lo vuelve a retirar. */
+function annulReturn(db, ctx, rid, reason) {
+  return db.tx(() => {
+    const r = db.get('SELECT * FROM sale_returns WHERE id=?', rid);
+    if (!r || r.status === 'anulado') throw bad('Devolución no encontrada o ya anulada.');
+    if (r.restock) {
+      let left = r.qty;
+      for (const a of db.all('SELECT * FROM sale_allocations WHERE line_id=? ORDER BY id DESC', r.line_id)) {
+        if (left <= 0) break; const q = Math.min(left, a.qty);
+        if (a.source === 'fg') P.takeFg(db, ctx, { lot_id: a.lot_id, qty: q, date: r.date, ref_type: 'anulacion_devolucion', ref_id: rid });
+        else {
+          const pl = db.get('SELECT * FROM pack_lots WHERE id=?', a.lot_id);
+          if (pl.qty_available + EPS < q) throw bad('No se puede anular: esas cajas ya se volvieron a vender.');
+          db.run('UPDATE pack_lots SET qty_available=qty_available-? WHERE id=?', q, a.lot_id);
+        }
+        left -= q;
+      }
+    }
+    L.reverseRef(db, ctx, 'devolucion', rid, reason || 'Devolución registrada por error');
+    const l = db.get('SELECT * FROM sale_lines WHERE id=?', r.line_id);
+    db.update('sale_lines', l.id, { returned_qty: Math.max(0, l.returned_qty - r.qty) });
+    db.update('sale_returns', rid, { status: 'anulado', annul_reason: reason || 'Registrada por error' });
+    audit(db, ctx, 'anular', 'devolucion', rid, { reason });
   });
 }
 
@@ -270,7 +308,7 @@ function saleDetail(db, id) {
 }
 function enrich(db, s) {
   s.paid = paidAmount(db, s.id);
-  const returned = r2(db.get('SELECT COALESCE(SUM(amount),0) a FROM sale_returns WHERE sale_id=?', s.id).a);
+  const returned = r2(db.get("SELECT COALESCE(SUM(amount),0) a FROM sale_returns WHERE sale_id=? AND status='activo'", s.id).a);
   s.returned = returned;
   s.net_total = s.status === 'cancelado' ? 0 : r2(s.total - returned);
   s.balance = r2(s.net_total - s.paid);
@@ -289,4 +327,4 @@ function listSales(db, { from, to, status } = {}) {
   });
 }
 
-module.exports = { STATUSES, createSale, updateSale, setStatus, addPayment, annulPayment, addReturn, saleDetail, listSales, paidAmount, enrich };
+module.exports = { STATUSES, annulReturn, createSale, updateSale, setStatus, addPayment, annulPayment, addReturn, saleDetail, listSales, paidAmount, enrich };

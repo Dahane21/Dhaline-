@@ -94,7 +94,7 @@ function saleFacts(db, { from, to }) {
   const facts = [];
   for (const l of lines) {
     const hShare = l.subtotal > 0 ? l.hdisc * (l.total / l.subtotal) : 0;
-    const ret = db.get('SELECT COALESCE(SUM(amount),0) a, COALESCE(SUM(cost),0) c FROM sale_returns WHERE line_id=?', l.id);
+    const ret = db.get("SELECT COALESCE(SUM(amount),0) a, COALESCE(SUM(cost),0) c FROM sale_returns WHERE line_id=? AND status='activo'", l.id);
     const keep = l.qty ? (l.qty - l.returned_qty) / l.qty : 0;
     const revenue = l.total - hShare * keep - ret.a;
     const cost = l.cost_total - ret.c;

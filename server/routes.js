@@ -163,6 +163,7 @@ function registerRoutes(route, db, { backup } = {}) {
   route('POST', '/api/sales/:id/status', (c) => { S.setStatus(db, c, id(c.params), c.body.status, c.body); return S.saleDetail(db, id(c.params)); });
   route('POST', '/api/sales/:id/payments', (c) => ({ id: S.addPayment(db, c, id(c.params), c.body) }));
   route('POST', '/api/payments/:id/annul', (c) => { S.annulPayment(db, c, id(c.params), c.body.reason); return { ok: true }; });
+  route('POST', '/api/returns/:id/annul', (c) => { S.annulReturn(db, c, id(c.params), c.body.reason); return { ok: true }; });
   route('POST', '/api/sales/:id/returns', (c) => ({ id: S.addReturn(db, c, id(c.params), c.body) }));
 
   // ---------- Finanzas ----------
