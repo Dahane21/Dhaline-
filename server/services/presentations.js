@@ -84,27 +84,27 @@ function assemble(db, ctx, { presentation_id, qty, date, fill, sale_id, notes, a
     let fgCost = 0; const itemCredits = {};
     let minExpiry = null;
     const fixedFill = Array.isArray(fill) ? fill.filter(f => Number(f.qty) > 0) : [];
+    const unitsPerBox = p.components.filter(c => c.kind === 'producto').reduce((t, c) => t + c.qty, 0);
+    // La mezcla elegida al armar REEMPLAZA el contenido configurado de la presentación (debe sumar lo mismo por caja).
+    const parts = fixedFill.length ? parseFill(fixedFill, unitsPerBox, p.name).map(f => ({ product_id: f.product_id, qty: f.qty * qty })) : null;
+    const takeParts = (list) => {
+      for (const part of list) {
+        const taken = part.product_id
+          ? P.takeFg(db, ctx, { product_id: part.product_id, quality_id: p.quality_id, qty: part.qty, date, ref_type: 'armado', ref_id: aid })
+          : takeAnyFg(db, ctx, { quality_id: p.quality_id, qty: part.qty, date, ref_type: 'armado', ref_id: aid });
+        for (const t of taken) {
+          db.insert('assembly_consumptions', { assembly_id: aid, source: 'fg', fg_lot_id: t.lot_id, qty: t.qty, cost: t.cost });
+          fgCost += t.cost;
+          const lot = db.get('SELECT expiry_date FROM fg_lots WHERE id=?', t.lot_id);
+          if (lot.expiry_date && (!minExpiry || lot.expiry_date < minExpiry)) minExpiry = lot.expiry_date;
+        }
+      }
+    };
+    if (parts) takeParts(parts);
     for (const c of p.components) {
       const need = c.qty * qty;
       if (c.kind === 'producto') {
-        let parts;
-        if (c.product_id) parts = [{ product_id: c.product_id, qty: need }];
-        else if (fixedFill.length) {
-          const s = fixedFill.reduce((t, f) => t + Number(f.qty), 0);
-          if (Math.abs(s - c.qty) > EPS) throw bad(`El contenido surtido de "${p.name}" debe sumar ${c.qty} unidades por caja (indicó ${s}).`);
-          parts = fixedFill.map(f => ({ product_id: Number(f.product_id), qty: Number(f.qty) * qty }));
-        } else parts = [{ product_id: null, qty: need }];
-        for (const part of parts) {
-          let taken;
-          if (part.product_id) taken = P.takeFg(db, ctx, { product_id: part.product_id, quality_id: p.quality_id, qty: part.qty, date, ref_type: 'armado', ref_id: aid });
-          else taken = takeAnyFg(db, ctx, { quality_id: p.quality_id, qty: part.qty, date, ref_type: 'armado', ref_id: aid });
-          for (const t of taken) {
-            db.insert('assembly_consumptions', { assembly_id: aid, source: 'fg', fg_lot_id: t.lot_id, qty: t.qty, cost: t.cost });
-            fgCost += t.cost;
-            const lot = db.get('SELECT expiry_date FROM fg_lots WHERE id=?', t.lot_id);
-            if (lot.expiry_date && (!minExpiry || lot.expiry_date < minExpiry)) minExpiry = lot.expiry_date;
-          }
-        }
+        if (!parts) takeParts([{ product_id: c.product_id || null, qty: need }]);
       } else {
         const r = INV.consume(db, { ...ctx, allowNegative: !!allow_negative }, { item_id: c.item_id, qty: need, date, type: 'consumo_empaque', ref_type: 'armado', ref_id: aid, note: `${code} ${p.name}` });
         db.insert('assembly_consumptions', { assembly_id: aid, source: 'item', item_id: c.item_id, qty: need, cost: r.cost });
@@ -121,6 +121,65 @@ function assemble(db, ctx, { presentation_id, qty, date, fill, sale_id, notes, a
     });
     audit(db, ctx, 'crear', 'armado', aid, { presentation_id, qty, fill });
     return { id: aid, pack_lot_id: plid, unit_cost: unit };
+  });
+}
+
+function parseFill(fill, unitsPerBox, name) {
+  const list = fill.map(f => ({ product_id: V.id(f.product_id, 'Sabor'), qty: V.num(f.qty, 'Cantidad por caja', { gt: 0, int: true }) }));
+  const sum = list.reduce((t, f) => t + f.qty, 0);
+  if (Math.abs(sum - unitsPerBox) > EPS) throw bad(`El contenido de "${name}" debe sumar ${unitsPerBox} chocotejas por caja (indicó ${sum}).`);
+  return list;
+}
+
+/**
+ * Corrige el contenido (sabores) de un armado ya registrado, aunque las cajas ya se hayan vendido.
+ * Devuelve las chocotejas tomadas a sus lotes, toma las correctas y ajusta el costo: la diferencia va a
+ * cajas armadas (si siguen en stock) o al costo de ventas (si ya se vendieron), y se recalcula la trazabilidad.
+ */
+function correctAssembly(db, ctx, id, fill) {
+  return db.tx(() => {
+    const a = db.get('SELECT * FROM assemblies WHERE id=?', id);
+    if (!a || a.status !== 'activo') throw bad('Armado no encontrado o anulado.');
+    const p = getPresentation(db, a.presentation_id);
+    const oldFg = db.all("SELECT * FROM assembly_consumptions WHERE assembly_id=? AND source='fg'", id);
+    const unitsPerBox = oldFg.reduce((t, c) => t + c.qty, 0) / a.qty;
+    const list = parseFill(Array.isArray(fill) ? fill.filter(f => Number(f.qty) > 0) : [], unitsPerBox, p.name);
+    const oldCost = oldFg.reduce((t, c) => t + c.cost, 0);
+    for (const c of oldFg) P.returnFg(db, ctx, { lot_id: c.fg_lot_id, qty: c.qty, date: a.date, ref_type: 'correccion_armado', ref_id: id, note: 'Corrección de contenido' });
+    db.run("DELETE FROM assembly_consumptions WHERE assembly_id=? AND source='fg'", id);
+    let newCost = 0;
+    for (const f of list) for (const t of P.takeFg(db, ctx, { product_id: f.product_id, quality_id: p.quality_id, qty: f.qty * a.qty, date: a.date, ref_type: 'correccion_armado', ref_id: id })) {
+      db.insert('assembly_consumptions', { assembly_id: id, source: 'fg', fg_lot_id: t.lot_id, qty: t.qty, cost: t.cost });
+      newCost += t.cost;
+    }
+    const diff = r6(newCost - oldCost);
+    const total = r6(a.total_cost + diff); const unit = r6(total / a.qty);
+    db.update('assemblies', id, { total_cost: total, unit_cost: unit });
+    const pl = db.get('SELECT * FROM pack_lots WHERE assembly_id=?', id);
+    db.update('pack_lots', pl.id, { unit_cost: unit });
+    // Ventas que usaron estas cajas: costo y trazabilidad recalculados
+    const allocs = db.all("SELECT a.*, l.sale_id FROM sale_allocations a JOIN sale_lines l ON l.id=a.line_id JOIN sales s ON s.id=l.sale_id WHERE a.source='pack' AND a.lot_id=? AND s.fulfilled=1", pl.id);
+    let soldQty = 0;
+    const comps = db.all('SELECT * FROM assembly_consumptions WHERE assembly_id=?', id);
+    for (const al of allocs) {
+      soldQty += al.qty;
+      db.update('sale_allocations', al.id, { unit_cost: unit });
+      db.run("DELETE FROM sale_cost_details WHERE line_id=? AND (fg_lot_id IN (SELECT fg_lot_id FROM assembly_consumptions WHERE assembly_id=?) OR fg_lot_id IN (" + (oldFg.map(c => c.fg_lot_id).join(',') || '0') + ") OR item_id IN (SELECT item_id FROM assembly_consumptions WHERE assembly_id=? AND source='item'))", al.line_id, id, id);
+      const share = al.qty / a.qty;
+      for (const c of comps) {
+        if (c.source === 'fg') { const lot = db.get('SELECT * FROM fg_lots WHERE id=?', c.fg_lot_id); db.insert('sale_cost_details', { line_id: al.line_id, product_id: lot.product_id, quality_id: lot.quality_id, batch_id: lot.batch_id, fg_lot_id: lot.id, qty: r6(c.qty * share), cost: r6(c.cost * share) }); }
+        else db.insert('sale_cost_details', { line_id: al.line_id, item_id: c.item_id, qty: r6(c.qty * share), cost: r6(c.cost * share) });
+      }
+      const lc = db.get('SELECT COALESCE(SUM(qty*unit_cost),0) c FROM sale_allocations WHERE line_id=?', al.line_id).c;
+      db.update('sale_lines', al.line_id, { cost_total: r6(lc) });
+      const sc = db.get('SELECT COALESCE(SUM(cost_total),0) c FROM sale_lines WHERE sale_id=?', al.sale_id).c;
+      db.update('sales', al.sale_id, { cost_total: r6(sc) });
+    }
+    const soldDiff = r6(diff * soldQty / a.qty), stockDiff = r6(diff - soldDiff);
+    L.post(db, ctx, { date: a.date, description: `Corrección de contenido del armado ${a.code}`, ref_type: 'armado_correccion', ref_id: id,
+      lines: [{ account: '1304', credit: diff }, { account: '1305', debit: stockDiff }, { account: '5101', debit: soldDiff }] });
+    audit(db, ctx, 'corregir', 'armado', id, { fill: list, diff });
+    return { diff };
   });
 }
 
@@ -168,4 +227,4 @@ function listPresentations(db) {
   });
 }
 
-module.exports = { getPresentation, savePresentation, presentationCost, assemble, annulAssembly, packStock, listPresentations, availableUnits };
+module.exports = { getPresentation, savePresentation, presentationCost, assemble, correctAssembly, annulAssembly, packStock, listPresentations, availableUnits };

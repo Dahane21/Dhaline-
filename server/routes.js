@@ -152,6 +152,7 @@ function registerRoutes(route, db, { backup } = {}) {
   route('PUT', '/api/presentations/:id', (c) => ({ id: PR.savePresentation(db, c, c.body, id(c.params)) }));
   route('GET', '/api/assemblies', () => db.all('SELECT a.*, p.name presentation, pl.qty_available FROM assemblies a JOIN presentations p ON p.id=a.presentation_id LEFT JOIN pack_lots pl ON pl.assembly_id=a.id ORDER BY a.id DESC'), read);
   route('POST', '/api/assemblies', (c) => PR.assemble(db, c, { ...c.body, date: V.date(c.body.date) }));
+  route('POST', '/api/assemblies/:id/content', (c) => PR.correctAssembly(db, c, id(c.params), c.body.fill));
   route('POST', '/api/assemblies/:id/annul', (c) => { PR.annulAssembly(db, c, id(c.params), c.body.reason); return { ok: true }; });
   route('GET', '/api/packs/stock', () => PR.packStock(db), read);
 

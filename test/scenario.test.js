@@ -284,3 +284,19 @@ test('corrección: anular devolución por error y volver de Entregado a Listo', 
   close(R.incomeStatement(db, monthRange(D.slice(0, 7))).opex.find(o => o.code === '6104').amount, 0); // gasto de delivery anulado
   assert.ok(integrity(db).ok);
 });
+
+test('armado: la mezcla elegida reemplaza el contenido fijo y se puede corregir después de vender', () => {
+  const env = fresh(); const { db, ctx, item, prod, q } = env; produce(env);
+  const pid = prod('Chocoteja de chinchín');
+  PU.createPurchase(db, ctx, { date: D, pay_status: 'pagado', account_code: '1101', lines: [{ kind: 'inventario', item_id: item('Cobertura de chocolate').id, qty: 1, unit: 'kg', total: 16 }] });
+  P.createBatch(db, ctx, { date: D, product_id: pid, qty_produced: 10, consumptions: [{ item_id: item('Cobertura de chocolate').id, qty: 100 }], outputs: [{ quality_id: q('A'), qty: 10 }, { quality_id: q('B'), qty: 0 }, { quality_id: q('C'), qty: 0 }] });
+  const box = PR.savePresentation(db, ctx, { name: 'Caja fija', quality_id: q('A'), price: 12, components: [{ kind: 'producto', product_id: prod('Chocoteja de pecanas'), qty: 3 }] });
+  const stock = (n) => (P.fgStock(db).find(s => s.product === n && s.code === 'A') || { qty: 0 }).qty;
+  const a = PR.assemble(db, ctx, { presentation_id: box, qty: 1, date: D, fill: [{ product_id: pid, qty: 2 }, { product_id: prod('Chocoteja de pecanas'), qty: 1 }] });
+  assert.equal(stock('Chocoteja de chinchín'), 8); assert.equal(stock('Chocoteja de pecanas'), 23);
+  assert.throws(() => PR.assemble(db, ctx, { presentation_id: box, qty: 1, date: D, fill: [{ product_id: pid, qty: 1 }] }), /debe sumar 3/);
+  S.createSale(db, ctx, { date: D, status: 'entregado', lines: [{ kind: 'presentacion', presentation_id: box, qty: 1, unit_price: 12 }] });
+  PR.correctAssembly(db, ctx, a.id, [{ product_id: pid, qty: 3 }]);
+  assert.equal(stock('Chocoteja de chinchín'), 7); assert.equal(stock('Chocoteja de pecanas'), 24);
+  assert.ok(integrity(db).ok, JSON.stringify(integrity(db)));
+});
